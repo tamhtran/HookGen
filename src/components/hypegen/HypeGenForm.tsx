@@ -17,30 +17,25 @@ import { ResultCard } from "./ResultCard";
 
 /**
  * @description
- * The main form component for HypeGen.
- * Handles user input, manages state for form fields, loading, errors, and API responses.
- * It will orchestrate the API call and display results (delegating to ResultCard later).
+ * The main form component for HypeGen (YouTube Content Repurposer).
+ * Handles YouTube URL input and vibe selection.
+ * Manages state for form fields, loading, errors, and API responses.
+ * Orchestrates the API call and displays results via ResultCard components.
  *
  * @component HypeGenForm
  */
 export function HypeGenForm() {
   // === State Hooks ===
-  const [contentType, setContentType] = useState<string>(""); // e.g., "YouTube Video"
-  const [topic, setTopic] = useState<string>(""); // e.g., "My First Look at Palworld"
-  const [highlight, setHighlight] = useState<string>(""); // e.g., "Caught a legendary Pal!"
-  const [vibe, setVibe] = useState<string>("Excited"); // Default vibe as per tech spec
+  const [url, setUrl] = useState<string>(""); // State for YouTube URL
+  const [vibe, setVibe] = useState<string>("Excited"); // Keep vibe state
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // Ensure apiResponse state expects the NEW HypeGenResponse structure
   const [apiResponse, setApiResponse] = useState<HypeGenResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // === Options for Select components ===
-  const contentTypeOptions = [
-    { value: "Stream VOD", label: "Stream VOD" },
-    { value: "YouTube Video", label: "YouTube Video" },
-    { value: "Podcast Episode", label: "Podcast Episode" },
-  ];
-
+  // === Options for Vibe Select component ===
+  // Removed contentTypeOptions
   const vibeOptions = [
     { value: "Excited", label: "Excited" },
     { value: "Funny", label: "Funny" },
@@ -49,21 +44,29 @@ export function HypeGenForm() {
     { value: "Urgent", label: "Urgent" },
   ];
 
+  // Basic regex for YouTube URL validation (adjust as needed for stricter checks)
+  const YOUTUBE_URL_REGEX =
+    /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_\-]{11})/;
+
   // === Form Submission Handler ===
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); // Prevent default page reload
-    console.log("handleSubmit triggered");
+    event.preventDefault();
+    console.log("handleSubmit triggered (v2)");
 
-    // 1. Basic Client-Side Validation
-    if (!contentType || !topic.trim() || !highlight.trim() || !vibe) {
-      console.error("Validation failed", {
-        contentType,
-        topic,
-        highlight,
-        vibe,
-      });
-      setError("Please fill in all required fields.");
-      setApiResponse(null); // Clear previous results if validation fails
+    // 1. Client-Side Validation
+    if (!vibe) {
+      // Vibe should always have a value due to default
+      setError("Please select a vibe.");
+      return;
+    }
+    if (!url.trim()) {
+      setError("Please enter a YouTube URL.");
+      return;
+    }
+    if (!YOUTUBE_URL_REGEX.test(url)) {
+      setError(
+        "Invalid YouTube URL format. Please check the URL and try again."
+      );
       return;
     }
 
@@ -71,17 +74,12 @@ export function HypeGenForm() {
     setError(null);
     setApiResponse(null);
     setIsLoading(true);
-    console.log("Starting API call...");
+    console.log("Starting API call (v2)...");
 
-    // 3. Construct Payload
-    const payload: HypeGenRequest = {
-      contentType,
-      topic,
-      highlight,
-      vibe,
-    };
+    // 3. Construct Payload (matches new HypeGenRequest)
+    const payload: HypeGenRequest = { url, vibe };
 
-    // 4. Make API Call
+    // 4. Make API Call (identical to previous implementation, but with new payload)
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -92,11 +90,9 @@ export function HypeGenForm() {
       });
 
       console.log("API response received, status:", response.status);
-      const result: HypeGenResponse = await response.json();
+      const result: HypeGenResponse = await response.json(); // Expects new HypeGenResponse structure
 
       if (!response.ok) {
-        // Handle HTTP errors (4xx, 5xx)
-        // Use error message from API response if available
         const errorMessage =
           result.success === false
             ? result.error
@@ -105,41 +101,40 @@ export function HypeGenForm() {
         throw new Error(errorMessage);
       }
 
-      // Handle potential logical errors returned in a 200 OK response
       if (result.success === false) {
         console.error("API returned logical error:", result.error);
         throw new Error(result.error);
       }
 
-      // Success Case
       console.log("API call successful, response:", result);
       setApiResponse(result);
     } catch (err: unknown) {
       console.error("Error during fetch or processing:", err);
       if (err instanceof Error) {
-        setError(err.message); // Set error message from caught error
+        setError(err.message);
       } else {
-        setError("An unexpected error occurred. Please try again."); // Fallback error
+        setError("An unexpected error occurred. Please try again.");
       }
-      setApiResponse(null); // Clear response data on error
+      setApiResponse(null);
     } finally {
-      // 5. Reset loading state regardless of outcome
+      // 5. Reset loading state
       setIsLoading(false);
-      console.log("Finished API call processing.");
+      console.log("Finished API call processing (v2).");
     }
   };
 
-  // Helper function to format platform keys into display names
+  // Helper function to format platform keys into display names (Keep this)
   const formatPlatformName = (key: string): string => {
     switch (key) {
       case "twitter":
         return "Twitter";
-      case "youtubeDescription":
-        return "YouTube / Twitch Description";
-      case "shortFormHook":
-        return "Short-form Video Hook";
+      case "instagram":
+        return "Instagram"; // Added Instagram
+      case "tiktok":
+        return "TikTok"; // Added TikTok
+      // Remove old cases if they existed
       default:
-        return key; // Fallback to the key itself
+        return key;
     }
   };
 
@@ -156,40 +151,25 @@ export function HypeGenForm() {
       gap="l"
     >
       <Heading as="h2" variant="heading-default-l" align="center">
-        Generate Promo Snippets
+        Generate YouTube Content Snippets
       </Heading>
 
       <form onSubmit={handleSubmit} className="w-full">
         <Column fillWidth gap="m">
-          <Select
-            id="content-type"
-            label="Content Type"
-            required
-            placeholder="Select Content Type..."
-            value={contentType}
-            options={contentTypeOptions}
-            onSelect={setContentType}
-          />
-
+          {/* YouTube URL Input */}
           <Input
-            id="topic"
-            label="Main Topic / Title"
+            id="youtube-url"
+            label="YouTube Video URL"
+            type="url"
             required
-            placeholder="e.g., My First Look at Palworld"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
+            placeholder="e.g., https://www.youtube.com/watch?v=..."
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            // Let the main error Feedback component handle URL errors now
+            // errorMessage={error?.includes('URL') ? error : undefined}
           />
 
-          <Textarea
-            id="highlight"
-            label="Key Highlight / Hook"
-            required
-            lines={3}
-            placeholder="e.g., Caught a legendary Pal!"
-            value={highlight}
-            onChange={(e) => setHighlight(e.target.value)}
-          />
-
+          {/* Target Vibe Select */}
           <Select
             id="vibe"
             label="Target Vibe / Tone"
@@ -199,44 +179,51 @@ export function HypeGenForm() {
             onSelect={setVibe}
           />
 
+          {/* Submit Button */}
           <Button
             type="submit"
-            label={isLoading ? "Generating..." : "Generate Snippets"}
+            label={isLoading ? "Generating..." : "Generate Content"}
             fillWidth
             arrowIcon
-            disabled={isLoading}
+            disabled={isLoading || !url || !YOUTUBE_URL_REGEX.test(url)} // Disable also if URL is invalid format
             variant="primary"
             size="l"
           />
         </Column>
       </form>
 
+      {/* Loading Indicator */}
       {isLoading && (
         <Column horizontal="center" paddingY="m">
           <Spinner size="l" />
         </Column>
       )}
 
+      {/* Error Display */}
       {error && (
         <Feedback variant="danger" title="Error" marginTop="m">
           {error}
         </Feedback>
       )}
 
+      {/* Results Section */}
       {apiResponse?.success && (
         <Column fillWidth gap="l" marginTop="l">
           <Heading as="h3" variant="heading-default-l">
             Generated Content
           </Heading>
+          {/* Ensure mapping uses the new HypeGenData structure */}
           {Object.entries(apiResponse.data).map(([platformKey, variations]) => (
             <ResultCard
               key={platformKey}
               platformName={formatPlatformName(platformKey)}
-              variations={variations}
+              variations={variations} // Pass the variations array directly
             />
           ))}
         </Column>
       )}
+
+      {/* API Error Display */}
       {!apiResponse?.success && apiResponse?.error && (
         <Feedback variant="danger" title="API Error" marginTop="m">
           {apiResponse.error}

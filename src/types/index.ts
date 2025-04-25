@@ -3,24 +3,33 @@
  * Defines the shape of the request body sent to the /api/generate endpoint.
  */
 export interface HypeGenRequest {
-  contentType: "Stream VOD" | "YouTube Video" | "Podcast Episode" | string; // Added string for flexibility if needed
-  topic: string;
-  highlight: string;
-  vibe: "Excited" | "Funny" | "Informative" | "Intriguing" | "Urgent" | string; // Added string for flexibility if needed
+  url: string; // YouTube video URL
+  vibe: string; // e.g., "Excited", "Funny", etc.
 }
 
 /**
  * @description
- * Defines the structure of the generated content data returned on success.
- * It's an object where keys are platform identifiers (e.g., 'twitter')
- * and values are tuples containing two string variations [variation1, variation2].
+ * Defines the structure for a single generated content variation.
+ * Topic, hook, description, and tags for one piece of content.
  */
-export type HypeGenData = {
-  [platform: string]: [string, string];
-  // Example structure:
-  // twitter: ["Check out my new stream VOD...", "Don't miss this stream VOD..."],
-  // youtubeDescription: ["In this video...", "Timestamped highlights..."],
-  // shortFormHook: ["Wait till you see this...", "OMG you won't believe..."]
+export type HypeGenVariation = {
+  topic: string;
+  hook: string;
+  description: string;
+  tags: string[]; // Array of hashtag strings (e.g., ["#palworld", "#gaming"])
+};
+
+/**
+ * @description
+ * Defines the structure of the generated content data returned on success.
+ * It's an object where keys are platform identifiers (twitter, instagram, tiktok)
+ * and values are arrays containing exactly three HypeGenVariation objects.
+ */
+export type HypeGenPlatformVariations = {
+  // Ensuring specific platforms are keys, each holding an array of 3 variations
+  twitter: [HypeGenVariation, HypeGenVariation, HypeGenVariation];
+  instagram: [HypeGenVariation, HypeGenVariation, HypeGenVariation];
+  tiktok: [HypeGenVariation, HypeGenVariation, HypeGenVariation];
 };
 
 /**
@@ -29,7 +38,7 @@ export type HypeGenData = {
  */
 export interface HypeGenSuccessResponse {
   success: true;
-  data: HypeGenData;
+  data: HypeGenPlatformVariations;
 }
 
 /**
@@ -38,7 +47,7 @@ export interface HypeGenSuccessResponse {
  */
 export interface HypeGenErrorResponse {
   success: false;
-  error: string;
+  error: string; // Descriptive error message (e.g., "Invalid YouTube URL", "Transcript unavailable")
 }
 
 /**

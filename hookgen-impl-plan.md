@@ -1,151 +1,165 @@
-# Implementation Plan (Using `once-ui` Components)
+# Implementation Plan: HypeGen (YouTube Content Repurposer using `once-ui`)
 
-## Setup & Configuration
+## Phase 1: Setup & Backend Core
 
-- [ ] Step 1: Verify Dependencies & Install OpenAI/Classnames
-  - **Task**: Check `package.json` for core Next.js/React/TS/Tailwind dependencies. Add `openai` and `classnames` if not already present.
+- [ ] **Step 1: Update Dependencies & Install youtube-transcript**
+  - **Task**: Check `package.json`. Ensure core dependencies (`next`, `react`, `openai`, etc.) are present. Add the `youtube-transcript` library.
   - **Files**:
-    - `package.json`: Ensure `"openai": "..."` and `"classnames": "..."` are in dependencies.
+    - `package.json`: Add `"youtube-transcript": "..."` to dependencies.
   - **Step Dependencies**: None.
   - **User Instructions**: Run `npm install` (or `yarn install`) in the project root (`/Users/ttran/hookgen`).
 
-- [ ] Step 2: Set Up Environment Variables
-  - **Task**: Create the `.env.local` file for the OpenAI API key and ensure it's gitignored.
+- [ ] **Step 2: Set Up Environment Variables (Verify)**
+  - **Task**: Ensure the `.env.local` file exists and contains `OPENAI_API_KEY`, and that `.env.local` is in `.gitignore`.
   - **Files**:
-    - `.env.local`: Create file with content `OPENAI_API_KEY=your_openai_api_key_here`.
-    - `.gitignore`: Verify `.env.local` is present.
+    - `.env.local`: Verify content `OPENAI_API_KEY=your_openai_api_key_here`.
+    - `.gitignore`: Verify `.env*.local` is present.
   - **Step Dependencies**: None.
-  - **User Instructions**: Replace `your_openai_api_key_here` in `.env.local` with your actual OpenAI API key. Restart the Next.js development server.
+  - **User Instructions**: Ensure your OpenAI API key is correctly set in `.env.local`.
 
-- [ ] Step 3: Review `once-ui` Configuration & Styles
-  - **Task**: Briefly review `src/app/resources/config.js`, `src/once-ui/styles/index.scss`, and `src/once-ui/tokens/index.scss` to understand the existing theme, styling variables, and global styles provided by the starter template.
+- [ ] **Step 3: Review `once-ui` Configuration & Styles (Verify)**
+  - **Task**: Briefly review `once-ui` config/styles to ensure familiarity (already done in the previous flow, but good to keep in mind).
   - **Files**:
     - `src/app/resources/config.js`
     - `src/once-ui/styles/index.scss`
     - `src/once-ui/tokens/index.scss`
   - **Step Dependencies**: None.
-  - **User Instructions**: Familiarize yourself with the available styling options and tokens in the `once-ui` system.
+  - **User Instructions**: None (assumes familiarity from previous steps).
 
-## Backend Development (API Route & Libs)
-
-- [ ] Step 4: Define API Types
-  - **Task**: Create the `types` directory (if it doesn't exist) and define shared TypeScript interfaces for the API request body and success/error responses.
+- [ ] **Step 4: Define New API Types**
+  - **Task**: Update `src/types/index.ts` with the new TypeScript interfaces based on the revised spec: `HypeGenRequest` (url, vibe), `HypeGenVariation` (topic, hook, description, tags), `HypeGenData` (map of platforms to `HypeGenVariation[]`), `HypeGenSuccessResponse`, `HypeGenErrorResponse`, and the union `HypeGenResponse`.
   - **Files**:
-    - `src/types/index.ts`: Create file. Define `HypeGenRequest`, `HypeGenData`, `HypeGenResponse`, `HypeGenErrorResponse` interfaces as specified in the technical specification.
+    - `src/types/index.ts`: Modify existing file with new type definitions.
   - **Step Dependencies**: None.
 
-- [ ] Step 5: Create API Route Structure & Basic Validation
-  - **Task**: Set up the file structure for the API route `/api/generate` and implement the basic `POST` handler with request body parsing and validation for required fields (`topic`, `highlight`).
+- [ ] **Step 5: Implement YouTube Utility**
+  - **Task**: Create `src/lib/youtube.ts`. Implement functions to:
+      1. Validate YouTube URL patterns (standard watch, youtu.be, shorts, live).
+      2. Extract video ID from a valid URL.
+      3. Fetch transcript and video title using `youtube-transcript`. Include error handling for fetch failures or unavailable transcripts.
   - **Files**:
-    - `src/app/api/generate/route.ts`: Create file. Import `NextRequest`, `NextResponse`. Export `async function POST(request: NextRequest)`. Parse JSON body (`await request.json()`). Check required fields. Return 400 error if invalid. Include try/catch.
-  - **Step Dependencies**: Step 4.
+    - `src/lib/youtube.ts`: Create file. Add URL parsing/validation logic and `youtube-transcript` fetching logic.
+  - **Step Dependencies**: Step 1 (dependency installed).
 
-- [ ] Step 6: Implement OpenAI Client Utility
-  - **Task**: Create the `lib` directory (if it doesn't exist) and the `openai.ts` utility to initialize the OpenAI client using the environment variable.
+- [ ] **Step 6: Implement OpenAI Client Utility (Verify)**
+  - **Task**: Ensure `src/lib/openai.ts` exists and correctly initializes the OpenAI client using the environment variable.
   - **Files**:
-    - `src/lib/openai.ts`: Create file. Import `OpenAI` from `openai`. Define and export a function `getOpenAIClient()` that checks for `process.env.OPENAI_API_KEY` (throws error if missing) and returns `new OpenAI(...)`.
-  - **Step Dependencies**: Step 1, Step 2.
+    - `src/lib/openai.ts`: Verify implementation.
+  - **Step Dependencies**: Step 2.
 
-- [ ] Step 7: Implement Prompt Generation Utilities
-  - **Task**: Create `lib/prompts.ts` with functions to generate platform-specific LLM message arrays based on request data, including instructions for variations, tone, emojis, hashtags, length, and JSON output format.
+- [ ] **Step 7: Update Prompt Generation Utilities**
+  - **Task**: Modify `src/lib/prompts.ts`. Create functions (e.g., `generatePlatformContentPrompt`) that take the fetched video `title`, `transcript`, and selected `vibe`. These functions should return message arrays for the OpenAI API, instructing it to generate 3 variations of `{ topic, hook, description, tags }` tailored for each platform (Twitter, Instagram, TikTok) and output the result as a specific JSON array structure (`HypeGenVariation[]`).
   - **Files**:
-    - `src/lib/prompts.ts`: Create file. Import `HypeGenRequest` from `types`. Define `generateTwitterPromptMessages`, `generateYoutubePromptMessages`, `generateShortsPromptMessages` functions returning message arrays as specified in the tech spec.
-  - **Step Dependencies**: Step 4.
+    - `src/lib/prompts.ts`: Modify file. Update imports for new types. Create new prompt generation logic targeting Twitter, Instagram, TikTok, using title/transcript/vibe, requesting 3 variations and the new JSON structure.
+  - **Step Dependencies**: Step 4 (new types).
 
-- [ ] Step 8: Implement Core API Generation & OpenAI Call Logic
-  - **Task**: Integrate the OpenAI client and prompt functions into the API route. Make parallel calls to OpenAI for each platform. Handle potential API errors. *Return raw content initially.*
+- [ ] **Step 8: Update API Route - Request Handling & YouTube Fetching**
+  - **Task**: Modify the `POST` handler in `src/app/api/generate/route.ts`.
+      1. Parse request body for `url` and `vibe`.
+      2. Use the utility from `lib/youtube.ts` to validate the `url` and extract the video ID. Return 400 if invalid.
+      3. Use the utility to fetch the title and transcript. Handle errors (e.g., transcript unavailable) and return appropriate error responses (404/500).
   - **Files**:
-    - `src/app/api/generate/route.ts`: Import utilities from `lib/`. In `POST`, get client, generate prompts, use `Promise.all` to call `openai.chat.completions.create` (model `gpt-4o` or `gpt-3.5-turbo`, temp 0.7). Wrap in `try...catch`. Log raw `choices[0].message.content`. Return temporary success JSON. Handle errors with 500 status.
-  - **Step Dependencies**: Step 5, Step 6, Step 7.
+    - `src/app/api/generate/route.ts`: Modify `POST` handler. Add imports for `lib/youtube.ts`. Implement URL validation and transcript/title fetching logic with error handling.
+  - **Step Dependencies**: Step 4 (new types), Step 5 (youtube util).
 
-- [ ] Step 9: Implement API Response Parsing and Validation
-  - **Task**: Refine the API route to safely parse the expected JSON array `[string, string]` from LLM responses. Validate the structure. Construct the final `HypeGenResponse` or return an error.
+- [ ] **Step 9: Update API Route - OpenAI Calls & Response Handling**
+  - **Task**: Continue modifying the `POST` handler in `src/app/api/generate/route.ts`.
+      1. Get the OpenAI client.
+      2. Use the updated prompt functions (`lib/prompts.ts`) with fetched title/transcript/vibe to generate message arrays for Twitter, Instagram, and TikTok.
+      3. Execute parallel OpenAI API calls using `Promise.all`.
+      4. Parse and validate the responses from OpenAI, ensuring each returns a valid JSON array of 3 `HypeGenVariation` objects. Handle parsing/validation errors (return 500).
+      5. Construct the final `HypeGenSuccessResponse` containing the structured data for all platforms, or return `HypeGenErrorResponse` if any step failed.
   - **Files**:
-    - `src/app/api/generate/route.ts`: Modify the `try` block after `Promise.all`. Use `JSON.parse()` on LLM content within nested try/catch. Validate parsed data is `[string, string]`. If valid, construct `HypeGenData`. Return `NextResponse.json({ success: true, data: ... })`. If parsing/validation fails, return 500 error with specific message.
-  - **Step Dependencies**: Step 8.
+    - `src/app/api/generate/route.ts`: Modify `POST` handler. Integrate new prompt functions, OpenAI calls, and implement robust parsing/validation for the new expected JSON structure (array of 3 variations per platform). Structure the final success/error response.
+  - **Step Dependencies**: Step 6 (openai client), Step 7 (new prompts), Step 8 (title/transcript available).
 
-## Frontend Development (Using `once-ui`)
+## Phase 2: Frontend Adaptation
 
-- [ ] Step 10: Clean Up Starter Page and Layout
-  - **Task**: Remove the example content from `src/app/page.tsx`. Ensure `src/app/layout.tsx` sets up the basic structure, fonts, and necessary providers (`ThemeProvider`, `ToastProvider`) from `once-ui`.
+- [ ] **Step 10: Clean Up Starter Page and Layout (Verify)**
+  - **Task**: Ensure `src/app/page.tsx` is clean and `src/app/layout.tsx` has necessary providers (already done). Add main page `Heading` if not already present.
   - **Files**:
-    - `src/app/page.tsx`: Remove demo components. Add a main container using `once-ui` `Column` or `Flex` with appropriate padding (e.g., `<Column fillWidth paddingY="80" paddingX="l" horizontal="center">`).
-    - `src/app/layout.tsx`: Verify structure, remove unnecessary demo imports/components. Ensure `ThemeProvider` and `ToastProvider` wrap `{children}`.
-  - **Step Dependencies**: Step 3.
+    - `src/app/page.tsx`
+    - `src/app/layout.tsx`
+  - **Step Dependencies**: None.
 
-- [ ] Step 11: Create `hypegen` Components Directory & Scaffold `HypeGenForm`
-  - **Task**: Create the `src/components/hypegen` directory. Create `HypeGenForm.tsx`, mark `'use client'`, set up basic structure and state hooks (`contentType`, `topic`, `highlight`, `vibe`, `isLoading`, `apiResponse`, `error`).
+- [ ] **Step 11: Update `HypeGenForm` State & Structure**
+  - **Task**: Modify `src/components/hypegen/HypeGenForm.tsx`.
+      1. Remove state hooks for `contentType`, `topic`, `highlight`.
+      2. Add state hook for `url`. Keep `vibe`, `isLoading`, `apiResponse` (update its type expectation), `error`.
+      3. Remove the old form input components (`Select` for type, `Input` for topic, `Textarea` for highlight).
   - **Files**:
-    - `src/components/hypegen/HypeGenForm.tsx`: Create file. Add `'use client'`. Import `useState`. Import necessary types. Define component. Add state hooks. Return placeholder JSX (e.g., `<Column>Form Placeholder</Column>`).
-  - **Step Dependencies**: Step 4.
+    - `src/components/hypegen/HypeGenForm.tsx`: Update state hooks and remove unused JSX elements.
+  - **Step Dependencies**: Step 4 (new types).
 
-- [ ] Step 12: Build Input Form UI using `once-ui` Components
-  - **Task**: Implement the form UI within `HypeGenForm.tsx` using `once-ui` components (`Select`, `Input`, `Textarea`, `Button`). Connect them to state variables.
+- [ ] **Step 12: Update Input Form UI**
+  - **Task**: Implement the new UI in `src/components/hypegen/HypeGenForm.tsx` using `once-ui`.
+      1. Add an `Input` component for the YouTube URL, bound to the `url` state.
+      2. Keep the `Select` component for the `vibe` state.
+      3. Ensure the `Button` label is "Generate Content".
   - **Files**:
-    - `src/components/hypegen/HypeGenForm.tsx`: Import components from `@/once-ui/components`. Add JSX for the form layout using `Column` and `Row` or `Flex`. Implement `Select` for Content Type & Vibe (provide options array). Implement `Input` for Topic. Implement `Textarea` for Highlight. Add the Generate `Button`. Use `label` and `id` props appropriately.
+    - `src/components/hypegen/HypeGenForm.tsx`: Add the URL `Input` component. Verify `Select` and `Button` components are correctly configured.
   - **Step Dependencies**: Step 11.
 
-- [ ] Step 13: Implement Form Submission Logic in `HypeGenForm`
-  - **Task**: Implement the `handleSubmit` function to validate inputs, set loading state, call the `/api/generate` endpoint using `fetch`, and update state based on the response.
+- [ ] **Step 13: Update Form Submission Logic**
+  - **Task**: Update the `handleSubmit` function in `src/components/hypegen/HypeGenForm.tsx`.
+      1. Implement robust client-side validation for the YouTube URL format using regex. Display error if invalid.
+      2. Ensure the payload sent via `fetch` contains `{ url, vibe }`.
+      3. Update state handling (`setApiResponse`, `setError`) to work with the new API response structure and potential errors (e.g., transcript fetch error).
   - **Files**:
-    - `src/components/hypegen/HypeGenForm.tsx`: Implement `handleSubmit` async function. Add basic required field checks. Set `isLoading`, clear `error`/`apiResponse`. Construct payload. Use `fetch` POST. Handle `res.ok`, parse JSON, update state. Set `isLoading` false in `finally`. Attach `handleSubmit` to the Button's `onClick`. Disable button if `isLoading`.
-  - **Step Dependencies**: Step 9, Step 12.
+    - `src/components/hypegen/HypeGenForm.tsx`: Modify `handleSubmit` function for URL validation and updated payload/response handling.
+  - **Step Dependencies**: Step 9 (API endpoint updated), Step 12 (UI updated).
 
-- [ ] Step 14: Display Loading and Error States using `once-ui`
-  - **Task**: Conditionally render a loading indicator (`once-ui` `Spinner`) and an error message (`once-ui` `Feedback`) based on the `isLoading` and `error` states.
+- [ ] **Step 14: Update Loading and Error States**
+  - **Task**: Ensure loading (`Spinner`) and error (`Feedback`) states in `HypeGenForm.tsx` correctly reflect the new process and handle potentially more specific error messages from the backend.
   - **Files**:
-    - `src/components/hypegen/HypeGenForm.tsx`: Import `Spinner`, `Feedback` from `@/once-ui/components`. Add conditional JSX: `{isLoading && <Spinner size="l" />}` and `{error && <Feedback variant="danger" title="Error">{error}</Feedback>}`.
+    - `src/components/hypegen/HypeGenForm.tsx`: Review and potentially adjust the conditional rendering of `Spinner` and `Feedback` components to display relevant messages.
   - **Step Dependencies**: Step 13.
 
-- [ ] Step 15: Scaffold `ResultCard` Component
-  - **Task**: Create `src/components/hypegen/ResultCard.tsx`, mark `'use client'`, define props, and set up basic `once-ui` `Card` structure.
+- [ ] **Step 15: Update `ResultCard` Props and Structure**
+  - **Task**: Modify `src/components/hypegen/ResultCard.tsx`.
+      1. Update the `ResultCardProps` interface to accept `platformName: string` and `variations: HypeGenVariation[]` (an array of 3 variations).
+      2. Update the internal structure (likely within the `Column` inside the `Card`) to prepare for displaying `topic`, `hook`, `description`, and `tags`.
   - **Files**:
-    - `src/components/hypegen/ResultCard.tsx`: Create file. Add `'use client'`. Import `Card`, `Heading`, `Flex` from `@/once-ui/components`. Define `ResultCardProps` interface. Render a basic Card with `Heading` for `platformName`.
-  - **Step Dependencies**: Step 4.
+    - `src/components/hypegen/ResultCard.tsx`: Update props interface and basic internal JSX structure.
+  - **Step Dependencies**: Step 4 (new types).
 
-- [ ] Step 16: Implement Variations Display with `SegmentedControl` in `ResultCard`
-  - **Task**: Use `once-ui` `SegmentedControl` (or simple state/buttons if `SegmentedControl` isn't suitable for tab-like content display) to switch between the two text variations. Display the selected variation text.
+- [ ] **Step 16: Update Variations Display in `ResultCard`**
+  - **Task**: Implement the display logic within `ResultCard.tsx`.
+      1. Update the `SegmentedControl` to show buttons "Variation 1", "Variation 2", "Variation 3". Update `handleToggle` and state accordingly.
+      2. Conditionally display the `topic` (e.g., using `Heading` or bold `Text`), `hook`, `description` (using `Text`), and `tags` (e.g., mapping to small `Text` elements or similar styled components) based on the `selectedVariationIndex`.
   - **Files**:
-    - `src/components/hypegen/ResultCard.tsx`: Import `SegmentedControl`, `Text` from `@/once-ui/components`. Add `useState` for `selectedVariationIndex`. Implement `SegmentedControl` with buttons "Variation 1", "Variation 2". Conditionally display `variations[selectedVariationIndex]` using a `Text` component below the control.
+    - `src/components/hypegen/ResultCard.tsx`: Implement `SegmentedControl` for 3 variations. Add JSX and styling to display topic, hook, description, and tags.
   - **Step Dependencies**: Step 15.
 
-- [ ] Step 17: Integrate `ResultCard` into `HypeGenForm` Results Display
-  - **Task**: Conditionally render the results section in `HypeGenForm`. Map `apiResponse.data` to render `ResultCard` components.
+- [ ] **Step 17: Update `ResultCard` Integration in `HypeGenForm`**
+  - **Task**: Modify the results mapping logic in `src/components/hypegen/HypeGenForm.tsx`.
+      1. Ensure the `Object.entries(apiResponse.data).map(...)` iterates over the correct platform keys (`twitter`, `instagram`, `tiktok`).
+      2. Pass the correct props (`platformName`, `variations` array) to each rendered `ResultCard`.
   - **Files**:
-    - `src/components/hypegen/HypeGenForm.tsx`: Add conditional block for `apiResponse.success`. Map `Object.entries(apiResponse.data)` to render `<ResultCard ... />`, passing formatted `platformName` and `variations`. Use `Flex` or `Column` with appropriate gap/padding for layout.
-  - **Step Dependencies**: Step 14, Step 16.
+    - `src/components/hypegen/HypeGenForm.tsx`: Update the mapping function to render `ResultCard` with the new data structure.
+  - **Step Dependencies**: Step 14 (results area ready), Step 16 (`ResultCard` ready).
 
-- [ ] Step 18: Add Twitter Character Count in `ResultCard`
-  - **Task**: Implement dynamic character count display for Twitter variations.
+- [ ] **Step 18: Update Copy-to-Clipboard Button in `ResultCard`**
+  - **Task**: Refine the copy button logic in `ResultCard.tsx`.
+      1. Decide what content to copy (e.g., primarily the description, maybe hook + description).
+      2. Update the `handleCopy` function to use `navigator.clipboard.writeText` with the chosen content for the `selectedVariationIndex`.
+      3. Ensure feedback (`isCopied` state, `IconButton` icon toggle, `useToast`) works correctly.
   - **Files**:
-    - `src/components/hypegen/ResultCard.tsx`: Import `Text` from `@/once-ui/components`. Inside the Twitter card logic (check `platformName`), add a `Text` component below the variation display. Calculate `variations[selectedVariationIndex].length`. Display count. Use `onBackground` prop (e.g., `danger-weak`) conditionally if > 280.
-  - **Step Dependencies**: Step 16.
+    - `src/components/hypegen/ResultCard.tsx`: Update `handleCopy` function logic.
+  - **Step Dependencies**: Step 16 (selected variation logic exists).
 
-- [ ] Step 19: Implement Copy-to-Clipboard Button in `ResultCard`
-  - **Task**: Add a copy button (`once-ui` `IconButton`) for the currently selected variation and implement clipboard logic with feedback.
-  - **Files**:
-    - `src/components/hypegen/ResultCard.tsx`: Import `IconButton`, `useState` from `@/once-ui/components` and `react`. Add `useState` for `isCopied`. Add an `IconButton` (e.g., `icon="clipboard"`). Implement `handleCopy` using `navigator.clipboard.writeText(variations[selectedVariationIndex])`. Set `isCopied` true, then false after timeout. Conditionally change icon name (`check` vs `clipboard`).
-  - **Step Dependencies**: Step 16.
-
-- [ ] Step 20: Render `HypeGenForm` on Main Page
-  - **Task**: Import and render the `HypeGenForm` component within `src/app/page.tsx`.
-  - **Files**:
-    - `src/app/page.tsx`: Import `HypeGenForm` from `@/components/hypegen/HypeGenForm`. Render `<HypeGenForm />` inside the main container.
-  - **Step Dependencies**: Step 12.
-
-- [ ] Step 21: Final UI Polish & Styling (using `once-ui` conventions)
-  - **Task**: Review UI against Polish Checklist. Adjust `once-ui` component props (padding, margin, gap, background, border, etc.) and potentially add minimal custom CSS/SCSS module overrides if needed for alignment/spacing. Ensure responsiveness and no console errors. Add page title using `once-ui` `Heading`.
+- [ ] **Step 19: Final UI Polish & Testing**
+  - **Task**: Review the complete UI flow. Check responsiveness, spacing, alignment, and overall user experience. Test with various valid/invalid YouTube URLs and check error handling. Fix any console errors.
   - **Files**:
     - `src/components/hypegen/HypeGenForm.tsx`
     - `src/components/hypegen/ResultCard.tsx`
-    - `src/app/page.tsx`: Add `<Heading as="h1" variant="display-default-l" align="center" marginBottom="l">HypeGen</Heading>`. Adjust main container props.
-    - *(Optional)* Create `src/components/hypegen/HypeGen.module.scss` for minor style overrides if needed.
+    - `src/app/page.tsx`
   - **Step Dependencies**: All previous UI steps.
 
-## Deployment (Optional)
+## Phase 3: Deployment
 
-- [ ] Step 22: Prepare & Deploy to Vercel
-  - **Task**: Verify local build (`npm run build`). Set environment variables on Vercel. Deploy.
+- [ ] **Step 20: Prepare & Deploy to Vercel**
+  - **Task**: Verify local build (`npm run build`). Ensure `OPENAI_API_KEY` is set correctly in Vercel environment variables. Deploy the updated application.
   - **Files**: Vercel project settings.
   - **Step Dependencies**: All previous steps.
-  - **User Instructions**: Set `OPENAI_API_KEY` in Vercel Environment Variables. Deploy via Git push or Vercel CLI.
+  - **User Instructions**: Run local build. Set environment variables on Vercel. Deploy via Git push or Vercel CLI.

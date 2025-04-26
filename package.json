@@ -6,6 +6,7 @@
     "export": "next export",
     "build": "next build",
     "start": "next start",
+    "test": "jest",
     "biome-write": "npx @biomejs/biome format --write .",
     "lint": "next lint"
   },
@@ -28,11 +29,17 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@csstools/postcss-global-data": "^2.1.1",
+    "@types/jest": "^29.5.14",
     "@types/node": "20.17.23",
     "@types/react": "19.0.1",
     "@types/react-dom": "19.0.2",
+    "dotenv": "^16.5.0",
+    "jest": "^29.7.0",
     "postcss-custom-media": "^10.0.7",
     "postcss-flexbugs-fixes": "^5.0.2",
+    "ts-jest": "^29.3.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "5.8.2"
   },
   "overrides": {

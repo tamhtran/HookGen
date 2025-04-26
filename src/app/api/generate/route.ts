@@ -14,67 +14,8 @@ import {
   generateTikTokContentPrompt,
 } from "@/lib/prompts"; // <-- Import prompt generators
 import { extractVideoId, fetchTranscriptAndTitle } from "@/lib/youtube"; // Import youtube utils
+import { parseAndValidateVariations } from "@/lib/validation"; // <-- Import from new location
 import OpenAI from "openai"; // <-- Import OpenAI type for error checking
-
-// Helper function for parsing and validation
-const parseAndValidateVariations = (
-  platform: string,
-  content: string | null | undefined
-): [HypeGenVariation, HypeGenVariation, HypeGenVariation] => {
-  if (!content) {
-    throw new Error(`Missing content from LLM for ${platform}.`);
-  }
-
-  console.log(
-    `Attempting to parse content for ${platform}:`,
-    content.substring(0, 100) + "..."
-  ); // Log start of content
-
-  try {
-    // Attempt to parse the content as JSON
-    const parsed: unknown = JSON.parse(content);
-
-    // Validate structure: must be an array of exactly 3 objects
-    if (
-      !Array.isArray(parsed) ||
-      parsed.length !== 3 ||
-      !parsed.every(
-        (item) =>
-          typeof item === "object" &&
-          item !== null &&
-          typeof item.topic === "string" &&
-          typeof item.hook === "string" &&
-          typeof item.description === "string" &&
-          Array.isArray(item.tags) &&
-          item.tags.every((tag: unknown) => typeof tag === "string")
-      )
-    ) {
-      console.error(
-        `Validation failed for ${platform}: Invalid structure or content`,
-        JSON.stringify(parsed, null, 2)
-      );
-      throw new Error(
-        `Invalid response structure from LLM for ${platform}. Expected JSON array of 3 objects with {topic, hook, description, tags}.`
-      );
-    }
-
-    // Type assertion is safe here due to the checks above
-    console.log(`Successfully parsed and validated response for ${platform}.`);
-    return parsed as [HypeGenVariation, HypeGenVariation, HypeGenVariation];
-  } catch (e) {
-    console.error(
-      `Validation failed for ${platform}: JSON parsing error or validation error`,
-      e
-    );
-    if (e instanceof SyntaxError) {
-      throw new Error(
-        `Invalid JSON format received from LLM for ${platform}. Parsing failed.`
-      );
-    }
-    // Re-throw our custom validation error or other errors
-    throw e;
-  }
-};
 
 /**
  * @description
@@ -125,25 +66,121 @@ export async function POST(
     ({ transcript, title } = await fetchTranscriptAndTitle(videoId));
     console.log(`Transcript fetched. Title: ${title || "[Not Available]"}`);
 
-    // ===>>> CONTINUE TO STEP 9 LOGIC (OpenAI calls, parsing, response) <<===
-    // Placeholder for now until Step 9 is implemented
-    console.warn(
-      "API route logic incomplete: OpenAI call and final response generation pending."
-    );
-    // Temporary response for testing fetch part
-    return NextResponse.json(
-      {
-        success: true, // Temporary success
-        message: "Transcript fetched (generation pending)",
-        debug: {
-          videoId,
-          title,
-          vibe,
-          transcriptLength: transcript?.length,
-        },
-      } as any,
-      { status: 200 }
-    );
+    // 4. Prepare for OpenAI Calls
+    if (!transcript) {
+      // Should have been caught earlier, but double-check
+      throw new Error("Transcript is missing, cannot proceed.");
+    }
+    const openai = getOpenAIClient();
+    const commonParams = { transcript, title, vibe };
+    const model = process.env.OPENAI_MODEL || "gpt-3.5-turbo-0125"; // Or your preferred model
+    console.log(`Using OpenAI model: ${model}`);
+
+    // 5. Call OpenAI API for each platform concurrently
+    console.log("Starting parallel OpenAI calls for all platforms...");
+    const [twitterResult, instagramResult, tiktokResult] =
+      await Promise.allSettled([
+        openai.chat.completions.create({
+          model: model,
+          messages: generateTwitterContentPrompt(commonParams),
+          response_format: { type: "json_object" }, // Ensure JSON output is requested
+          temperature: 0.7, // Adjust creativity
+        }),
+        openai.chat.completions.create({
+          model: model,
+          messages: generateInstagramContentPrompt(commonParams),
+          response_format: { type: "json_object" },
+          temperature: 0.7,
+        }),
+        openai.chat.completions.create({
+          model: model,
+          messages: generateTikTokContentPrompt(commonParams),
+          response_format: { type: "json_object" },
+          temperature: 0.7,
+        }),
+      ]);
+    console.log("All OpenAI calls finished.");
+
+    /* --- DEBUG: Log raw response and exit (COMMENTED OUT) ---
+    if (tiktokResult.status === 'fulfilled') {
+      const rawContent = tiktokResult.value.choices[0]?.message?.content;
+      console.log("--- RAW TIKTOK RESPONSE START ---");
+      console.log(rawContent);
+      console.log("--- RAW TIKTOK RESPONSE END ---");
+
+      // Return a temporary response indicating success but showing raw data
+      return NextResponse.json({ 
+        success: true, // Indicate API call itself was okay
+        debug_message: "Returning raw content for debugging.",
+        raw_content: rawContent 
+      } as any, { status: 200 }); // <-- Cast to any to satisfy linter during debug
+
+    } else {
+      // Handle case where the OpenAI call itself failed
+      console.error('TikTok generation failed (OpenAI API error):', tiktokResult.reason);
+      throw new Error(`OpenAI API call failed for TikTok: ${tiktokResult.reason.message || tiktokResult.reason}`);
+    }
+    --- END DEBUG SECTION --- */
+
+    // --- Original processing logic (UNCOMMENTED) ---
+    // 6. Process results and handle potential errors
+    // Initialize for all platforms
+    const responseData: HypeGenPlatformVariations = {
+      twitter: undefined as any, // Placeholder
+      instagram: undefined as any, // Placeholder
+      tiktok: undefined as any, // Placeholder
+    };
+
+    // Process Twitter results
+    if (twitterResult.status === "fulfilled") {
+      console.log("Processing Twitter response...");
+      const content = twitterResult.value.choices[0]?.message?.content;
+      responseData.twitter = parseAndValidateVariations("twitter", content);
+    } else {
+      console.error("Twitter generation failed:", twitterResult.reason);
+      throw new Error(
+        `Failed to generate content for Twitter: ${
+          twitterResult.reason.message || twitterResult.reason
+        }`
+      );
+    }
+
+    // Process Instagram results
+    if (instagramResult.status === "fulfilled") {
+      console.log("Processing Instagram response...");
+      const content = instagramResult.value.choices[0]?.message?.content;
+      responseData.instagram = parseAndValidateVariations("instagram", content);
+    } else {
+      console.error("Instagram generation failed:", instagramResult.reason);
+      throw new Error(
+        `Failed to generate content for Instagram: ${
+          instagramResult.reason.message || instagramResult.reason
+        }`
+      );
+    }
+
+    // Process TikTok results
+    if (tiktokResult.status === "fulfilled") {
+      console.log("Processing TikTok response...");
+      const content = tiktokResult.value.choices[0]?.message?.content;
+      responseData.tiktok = parseAndValidateVariations("tiktok", content);
+    } else {
+      console.error("TikTok generation failed:", tiktokResult.reason);
+      throw new Error(
+        `Failed to generate content for TikTok: ${
+          tiktokResult.reason.message || tiktokResult.reason
+        }`
+      );
+    }
+
+    // 7. Send final successful response (now includes all platforms)
+    const successResponse: HypeGenSuccessResponse = {
+      success: true,
+      data: responseData, // No cast needed now
+    };
+    console.log("Generation successful for all platforms. Sending response.");
+    return NextResponse.json(successResponse, { status: 200 });
+    // --- End Original processing logic ---
   } catch (error: unknown) {
     console.error("Error during API processing:", error);
     let errorMessage = "An internal server error occurred.";

@@ -2,11 +2,11 @@ import type { HypeGenRequest } from "@/types";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { HypeGenVariation } from "@/types";
 
-// Define the structure we expect OpenAI to return in the JSON array
-const EXPECTED_JSON_STRUCTURE_DESCRIPTION = `Each object in the array must have the following structure: { "topic": string, "hook": string, "description": string, "tags": string[] }`;
+// Define the structure we expect OpenAI to return
+const EXPECTED_VARIATION_STRUCTURE = `{ "topic": string, "hook": string, "description": string, "tags": string[] }`;
 
-// Define the standard JSON output instruction, requesting an array of 3 variations
-const JSON_OUTPUT_INSTRUCTION = `You MUST provide your response as a valid JSON array containing exactly THREE distinct objects, like this: [ {variation1}, {variation2}, {variation3} ]. ${EXPECTED_JSON_STRUCTURE_DESCRIPTION}. Do not include any other text, explanations, or markdown formatting outside of this JSON array.`;
+// Define the standard JSON output instruction, requesting an object containing an array of 3 variations
+const JSON_OUTPUT_INSTRUCTION = `CRITICAL REQUIREMENT: Your entire response MUST be a single JSON object. This object MUST contain a key named "variations", and the value of "variations" MUST be a JSON array containing exactly THREE (3) distinct objects. Do NOT add any text before or after the JSON object. Example format: { "variations": [ {variation1_${EXPECTED_VARIATION_STRUCTURE}}, {variation2_${EXPECTED_VARIATION_STRUCTURE}}, {variation3_${EXPECTED_VARIATION_STRUCTURE}} ] }.`;
 
 // Interface for the data needed by the prompt generator
 interface PromptGenerationParams {

@@ -15,7 +15,10 @@ interface ElementTypeProps {
 const isExternalLink = (url: string) => /^https?:\/\//.test(url);
 
 const ElementType = forwardRef<HTMLElement, ElementTypeProps>(
-  ({ href, type, onClick, onLinkClick, children, className, style, ...props }, ref) => {
+  (
+    { href, type, onClick, onLinkClick, children, className, style, ...props },
+    ref
+  ) => {
     if (href) {
       const isExternal = isExternalLink(href);
       if (isExternal) {
@@ -55,6 +58,7 @@ const ElementType = forwardRef<HTMLElement, ElementTypeProps>(
           className={className}
           onClick={onClick}
           style={style}
+          type={type === "submit" ? "submit" : "button"}
           {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}
         >
           {children}
@@ -72,7 +76,7 @@ const ElementType = forwardRef<HTMLElement, ElementTypeProps>(
         {children}
       </Flex>
     );
-  },
+  }
 );
 
 ElementType.displayName = "ElementType";
